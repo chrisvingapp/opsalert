@@ -9,8 +9,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 class OpsAlertBase(DeclarativeBase):
     """Package's own declarative base.
 
-    Host applications add ``OpsAlertBase.metadata`` to their Alembic
-    ``target_metadata`` list so migrations can manage this table.
+    Tables are created via ``opsalert.ensure_tables(engine)`` at startup.
     """
 
     pass
