@@ -31,15 +31,15 @@ class Alert(OpsAlertBase):
 
     __table_args__ = (
         # Dashboard L1: group by category, ordered by recency
-        Index("ix_opsalert_cat_created", "category", "created"),
+        Index("ix_admin_alert_cat_created", "category", "created"),
         # Dashboard L2: message-level drill-down
-        Index("ix_opsalert_cat_msg", "category", "message"),
+        Index("ix_admin_alert_cat_msg", "category", "message"),
         # Delivery sweeper: find un-notified alerts by severity
-        Index("ix_opsalert_notified_sev", "notified", "severity", "category"),
+        Index("ix_admin_alert_notified_sev", "notified", "severity", "category"),
         # Batch throttle check: recent notified alerts per category
-        Index("ix_opsalert_cat_notified_created", "category", "notified", "created"),
+        Index("ix_admin_alert_cat_notified_created", "category", "notified", "created"),
         # Cleanup sweeper: age-based deletion
-        Index("ix_opsalert_created", "created"),
+        Index("ix_admin_alert_created", "created"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

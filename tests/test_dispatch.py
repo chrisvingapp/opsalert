@@ -85,10 +85,12 @@ class TestTestingMode:
 class TestConfigRequired:
     """Test that configure() must be called before use."""
 
-    def test_fire_without_configure_raises(self):
-        """Calling warn/error/critical without configure() raises RuntimeError."""
-        with pytest.raises(RuntimeError, match="opsalert.configure"):
-            opsalert.warn("cat", message="test")
+    def test_fire_without_configure_is_noop(self):
+        """Calling warn/error/critical without configure() silently no-ops."""
+        # Should not raise — dispatch functions never disrupt caller
+        opsalert.warn("cat", message="test")
+        opsalert.error("cat", message="test")
+        opsalert.critical("cat", message="test")
 
     async def test_get_config_without_configure_raises(self):
         """get_config() raises RuntimeError if not configured."""

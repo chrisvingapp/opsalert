@@ -51,13 +51,17 @@ def _fire_sync(
 
     Tries to get the running event loop first (FastAPI context),
     falls back to creating a new one (Celery/sync context).
-    Never raises — all failures are logged inside _fire().
+    Never raises — all failures are logged, caller unaffected.
 
-    No-ops in test mode: the alert API opens its own session (bypassing
-    the test transaction), so alerts would leak into the test DB and
-    reference rows that get rolled back.
+    No-ops when:
+    - testing mode is enabled (alerts would leak outside test transaction)
+    - configure() hasn't been called (e.g. test suite without startup)
     """
-    cfg = get_config()
+    try:
+        cfg = get_config()
+    except RuntimeError:
+        # Not configured — silently skip rather than disrupting caller
+        return
     if cfg.testing:
         return
 
