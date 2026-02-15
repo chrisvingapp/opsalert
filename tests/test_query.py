@@ -411,6 +411,48 @@ class TestQueryNextFix:
         # Callers limited by occurrence fetch
         assert len(result["callers"]) <= 5
 
+    async def test_returns_fix_hint_from_config(self, session, session_factory):
+        """Returns fix_hint from configured fix_hints map."""
+        import opsalert
+        opsalert.configure(
+            session_factory=session_factory,
+            fix_hints={"sendgrid": "Check SendGrid API key and rate limits."},
+            default_fix_hint="Generic fix hint.",
+        )
+
+        await _seed_alerts(session, [
+            {"severity": "error", "category": "sendgrid", "message": "500"},
+        ])
+
+        result = await query_next_fix(session)
+        assert result["fix_hint"] == "Check SendGrid API key and rate limits."
+
+    async def test_returns_default_fix_hint_when_no_match(self, session, session_factory):
+        """Returns default_fix_hint when category not in fix_hints map."""
+        import opsalert
+        opsalert.configure(
+            session_factory=session_factory,
+            fix_hints={"other_cat": "Irrelevant hint."},
+            default_fix_hint="Default hint for unknown categories.",
+        )
+
+        await _seed_alerts(session, [
+            {"severity": "error", "category": "unknown_cat", "message": "boom"},
+        ])
+
+        result = await query_next_fix(session)
+        assert result["fix_hint"] == "Default hint for unknown categories."
+
+    async def test_fix_hint_fallback_when_unconfigured(self, session):
+        """Returns hardcoded fallback when opsalert is not configured."""
+        # reset_opsalert_config fixture ensures unconfigured state
+        await _seed_alerts(session, [
+            {"severity": "error", "category": "cat", "message": "m"},
+        ])
+
+        result = await query_next_fix(session)
+        assert result["fix_hint"] == "Examine the tracebacks and code locations above."
+
 
 # ---------------------------------------------------------------------------
 # delete_by_category

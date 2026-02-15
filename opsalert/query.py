@@ -332,6 +332,14 @@ async def query_next_fix(
             if user_ctx:
                 samples.append(user_ctx)
 
+    # Resolve fix hint from configured hints (defensive for unconfigured state)
+    try:
+        from opsalert._config import get_config
+        cfg = get_config()
+        fix_hint = cfg.fix_hints.get(row.category, cfg.default_fix_hint)
+    except RuntimeError:
+        fix_hint = "Examine the tracebacks and code locations above."
+
     return {
         "category": row.category,
         "message": row.message,
@@ -344,6 +352,7 @@ async def query_next_fix(
         "exception_signatures": sorted(exc_sigs),
         "tracebacks": tracebacks,
         "sample_contexts": samples,
+        "fix_hint": fix_hint,
     }
 
 
