@@ -15,15 +15,6 @@ Usage::
     opsalert.critical("startup_failure", message="DB pool exhausted")
 """
 from opsalert._config import configure, get_config, reset_config
-
-
-def ensure_tables(engine) -> None:
-    """Create opsalert tables if they don't exist.
-
-    Call once at application startup with a sync engine.
-    Uses checkfirst=True (default) — safe to call repeatedly.
-    """
-    OpsAlertBase.metadata.create_all(engine)
 from opsalert._dispatch import warn, error, critical
 from opsalert.model import Alert, OpsAlertBase
 from opsalert.store import fire_alert
@@ -40,6 +31,16 @@ from opsalert.delivery import deliver_alerts
 from opsalert.cleanup import cleanup_alerts
 from opsalert.transport import Transport, CallableTransport, LogTransport, WebhookTransport
 from opsalert.types import AlertSeverity, AlertMessage, IMMEDIATE_SEVERITIES, DIGEST_SEVERITIES
+
+
+def ensure_tables(engine) -> None:
+    """Create opsalert tables if they don't exist.
+
+    Call once at application startup with a sync engine.
+    Uses checkfirst=True (default) — safe to call repeatedly.
+    """
+    OpsAlertBase.metadata.create_all(engine)
+
 
 __all__ = [
     # Configuration
