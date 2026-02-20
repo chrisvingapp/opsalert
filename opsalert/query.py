@@ -262,7 +262,7 @@ async def query_next_fix(
 ) -> dict | None:
     """Find highest-priority alert group with aggregated debugging data.
 
-    Priority: CRITICAL > ERROR > WARN, then highest count, then most recent.
+    Priority: CRITICAL > ERROR > WARN, then oldest first.
     Returns None if no alerts exist.
 
     Performance fix: LIMIT on occurrence fetch (was unbounded), selects only
@@ -286,8 +286,7 @@ async def query_next_fix(
         .group_by(Alert.category, Alert.message)
         .order_by(
             desc("severity_rank"),
-            desc("count"),
-            desc("latest_created"),
+            "first_created",
         )
         .limit(1)
     )

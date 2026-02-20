@@ -322,8 +322,8 @@ class TestQueryNextFix:
         assert result["severity"] == "critical"
         assert result["category"] == "infra"
 
-    async def test_higher_count_breaks_severity_tie(self, session):
-        """When severities tie, higher count wins."""
+    async def test_oldest_breaks_severity_tie(self, session):
+        """When severities tie, oldest group (by first occurrence) wins."""
         await _seed_alerts(session, [
             {"severity": "error", "category": "a", "message": "m"},
             {"severity": "error", "category": "b", "message": "m"},
@@ -332,8 +332,9 @@ class TestQueryNextFix:
         ])
 
         result = await query_next_fix(session)
-        assert result["category"] == "b"
-        assert result["count"] == 3
+        # "a" was inserted first (oldest), so it wins despite fewer occurrences
+        assert result["category"] == "a"
+        assert result["count"] == 1
 
     async def test_aggregates_callers(self, session):
         """Collects unique _caller values from context."""
