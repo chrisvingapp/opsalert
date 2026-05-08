@@ -1,7 +1,4 @@
 """Tests for the fire API — warn/error/critical dispatch."""
-import asyncio
-from unittest.mock import patch, AsyncMock
-
 import pytest
 from sqlalchemy import select
 
@@ -98,6 +95,25 @@ class TestConfigRequired:
             opsalert.get_config()
 
 
+class TestConfigTraceProvider:
+    """Test that configure() accepts and stores trace_provider."""
+
+    def test_configure_stores_trace_provider(self, session_factory):
+        """configure(trace_provider=fn) stores the callable on config."""
+        provider = lambda: ("id", "origin")
+        opsalert.configure(session_factory=session_factory, trace_provider=provider)
+
+        cfg = opsalert.get_config()
+        assert cfg.trace_provider is provider
+
+    def test_configure_trace_provider_defaults_to_none(self, session_factory):
+        """Without trace_provider, config defaults to None."""
+        opsalert.configure(session_factory=session_factory)
+
+        cfg = opsalert.get_config()
+        assert cfg.trace_provider is None
+
+
 class TestEnrichment:
     """Test that auto-enrichment adds debugging info."""
 
@@ -162,6 +178,74 @@ class TestEnrichment:
 
         assert "_caller" in ctx
         assert isinstance(ctx, dict)
+
+    async def test_trace_provider_adds_trace_fields(self, session, session_factory):
+        """When trace_provider returns (id, origin), both appear in enriched context."""
+        opsalert.configure(
+            session_factory=session_factory,
+            trace_provider=lambda: ("req-abc-123", "POST /api/alerts"),
+        )
+
+        ctx = opsalert._dispatch.enrich_context({"user_key": "val"})
+
+        assert ctx["_trace_id"] == "req-abc-123"
+        assert ctx["_trace_origin"] == "POST /api/alerts"
+        # Caller-provided data preserved
+        assert ctx["user_key"] == "val"
+
+    async def test_trace_provider_none_values_omitted(self, session, session_factory):
+        """When trace_provider returns (None, None), no trace keys appear."""
+        opsalert.configure(
+            session_factory=session_factory,
+            trace_provider=lambda: (None, None),
+        )
+
+        ctx = opsalert._dispatch.enrich_context(None)
+
+        assert "_trace_id" not in ctx
+        assert "_trace_origin" not in ctx
+        # Standard enrichment still works
+        assert "_caller" in ctx
+
+    async def test_trace_provider_not_configured(self, session, session_factory):
+        """When trace_provider is None (default), enrichment works without trace keys."""
+        opsalert.configure(session_factory=session_factory)
+
+        ctx = opsalert._dispatch.enrich_context(None)
+
+        assert "_trace_id" not in ctx
+        assert "_trace_origin" not in ctx
+        assert "_caller" in ctx
+
+    async def test_trace_provider_exception_graceful(self, session, session_factory):
+        """When trace_provider raises, enrichment continues without trace keys."""
+        def bad_provider():
+            raise RuntimeError("context lost")
+
+        opsalert.configure(
+            session_factory=session_factory,
+            trace_provider=bad_provider,
+        )
+
+        ctx = opsalert._dispatch.enrich_context({"important": "data"})
+
+        assert "_trace_id" not in ctx
+        assert "_trace_origin" not in ctx
+        # Enrichment still completed for everything else
+        assert "_caller" in ctx
+        assert ctx["important"] == "data"
+
+    async def test_trace_provider_partial_values(self, session, session_factory):
+        """When trace_provider returns only trace_id (origin is None), only _trace_id appears."""
+        opsalert.configure(
+            session_factory=session_factory,
+            trace_provider=lambda: ("req-xyz-789", None),
+        )
+
+        ctx = opsalert._dispatch.enrich_context(None)
+
+        assert ctx["_trace_id"] == "req-xyz-789"
+        assert "_trace_origin" not in ctx
 
 
 class TestFireFailureHandling:

@@ -37,6 +37,10 @@ class OpsAlertConfig:
     # Optional runtime settings resolver: (key: str) → value | None
     get_setting: Callable[[str], Any] | None = None
 
+    # Returns (trace_id, trace_origin) from the current execution context.
+    # Injected by the host app so opsalert stays dependency-free.
+    trace_provider: Callable[[], tuple[str | None, str | None]] | None = None
+
 
 _config: OpsAlertConfig | None = None
 

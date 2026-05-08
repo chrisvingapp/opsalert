@@ -54,4 +54,17 @@ def enrich_context(context: dict[str, Any] | None) -> dict[str, Any]:
     except Exception:
         pass
 
+    # --- Request trace ---
+    try:
+        from opsalert._config import get_config
+        cfg = get_config()
+        if cfg.trace_provider is not None:
+            tid, torigin = cfg.trace_provider()
+            if tid is not None:
+                enriched["_trace_id"] = tid
+            if torigin is not None:
+                enriched["_trace_origin"] = torigin
+    except Exception:
+        pass
+
     return enriched
