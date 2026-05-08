@@ -230,6 +230,37 @@ async def query_occurrences(
     return items, total
 
 
+async def query_by_trace_id(
+    session: "AsyncSession",
+    trace_id: str,
+    *,
+    limit: int = 50,
+) -> list[dict]:
+    """Find alerts whose context_json contains a specific _trace_id.
+
+    Uses JSON_EXTRACT on the Text column (works in MySQL 5.7+ and SQLite 3.38+).
+    """
+    query = (
+        select(Alert)
+        .where(func.json_extract(Alert.context_json, "$._trace_id") == trace_id)
+        .order_by(desc(Alert.created))
+        .limit(limit)
+    )
+    result = await session.execute(query)
+    return [
+        {
+            "id": a.id,
+            "severity": a.severity,
+            "category": a.category,
+            "source": a.source,
+            "message": a.message,
+            "context_json": a.context_json,
+            "created": a.created,
+        }
+        for a in result.scalars().all()
+    ]
+
+
 async def query_aggregates(session: "AsyncSession") -> dict:
     """Aggregate statistics for the alert dashboard.
 

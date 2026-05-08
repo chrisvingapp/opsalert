@@ -22,6 +22,7 @@ from opsalert.query import (
     query_categories,
     query_messages,
     query_occurrences,
+    query_by_trace_id,
     query_aggregates,
     query_next_fix,
     delete_by_category,
@@ -58,6 +59,7 @@ __all__ = [
     "query_categories",
     "query_messages",
     "query_occurrences",
+    "query_by_trace_id",
     "query_aggregates",
     "query_next_fix",
     # Delete API

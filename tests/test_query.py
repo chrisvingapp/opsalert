@@ -12,6 +12,7 @@ from opsalert.query import (
     query_categories,
     query_messages,
     query_occurrences,
+    query_by_trace_id,
     query_aggregates,
     query_next_fix,
     delete_by_category,
@@ -526,3 +527,72 @@ class TestDeleteById:
         """Returns False when alert ID doesn't exist."""
         ok = await delete_by_id(session, alert_id=99999)
         assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# query_by_trace_id
+# ---------------------------------------------------------------------------
+
+
+class TestQueryByTraceId:
+    """Test trace_id lookup via JSON_EXTRACT on context_json."""
+
+    async def test_finds_alerts_with_matching_trace_id(self, session):
+        tid = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"
+        await _seed_alerts(session, [
+            {"severity": "error", "category": "cat", "message": "traced",
+             "context": {"_trace_id": tid, "user_key": "val"}},
+            {"severity": "warn", "category": "cat", "message": "other",
+             "context": {"_trace_id": "ffffffffffffffffffffffffffffffff"}},
+        ])
+
+        results = await query_by_trace_id(session, tid)
+        assert len(results) == 1
+        assert results[0]["message"] == "traced"
+
+    async def test_returns_empty_for_unknown_trace_id(self, session):
+        await _seed_alerts(session, [
+            {"severity": "error", "category": "cat", "message": "m",
+             "context": {"_trace_id": "a" * 32}},
+        ])
+
+        results = await query_by_trace_id(session, "b" * 32)
+        assert results == []
+
+    async def test_skips_alerts_without_trace_id(self, session):
+        tid = "c" * 32
+        await _seed_alerts(session, [
+            {"severity": "error", "category": "cat", "message": "with_trace",
+             "context": {"_trace_id": tid}},
+            {"severity": "error", "category": "cat", "message": "no_context"},
+            {"severity": "error", "category": "cat", "message": "no_trace_key",
+             "context": {"other_key": "val"}},
+        ])
+
+        results = await query_by_trace_id(session, tid)
+        assert len(results) == 1
+        assert results[0]["message"] == "with_trace"
+
+    async def test_returns_multiple_alerts_for_same_trace(self, session):
+        tid = "d" * 32
+        await _seed_alerts(session, [
+            {"severity": "error", "category": "cat", "message": "first",
+             "context": {"_trace_id": tid}},
+            {"severity": "warn", "category": "cat", "message": "second",
+             "context": {"_trace_id": tid}},
+            {"severity": "critical", "category": "cat", "message": "third",
+             "context": {"_trace_id": tid}},
+        ])
+
+        results = await query_by_trace_id(session, tid)
+        assert len(results) == 3
+
+    async def test_respects_limit(self, session):
+        tid = "e" * 32
+        for i in range(5):
+            await fire_alert(session, severity="error", category="cat",
+                             message=f"msg {i}", context={"_trace_id": tid})
+        await session.commit()
+
+        results = await query_by_trace_id(session, tid, limit=2)
+        assert len(results) == 2
